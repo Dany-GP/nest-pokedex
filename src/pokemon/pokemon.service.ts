@@ -1,19 +1,23 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, Query } from '@nestjs/common';
 import { CreatePokemonDto } from './dto/create-pokemon.dto';
 import { UpdatePokemonDto } from './dto/update-pokemon.dto';
 import { Model, isValidObjectId } from 'mongoose';
 import { Pokemon } from './entities/pokemon.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { error } from 'console';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PokemonService {
 
   constructor(
     @InjectModel(Pokemon.name)
-    private readonly pokemonModel: Model<Pokemon>
+    private readonly pokemonModel: Model<Pokemon>,
+    private readonly configService: ConfigService
   ) {
-
+    console.log(configService.get('port'));
+    
   }
 
   async create(createPokemonDto: CreatePokemonDto) {
@@ -35,13 +39,25 @@ export class PokemonService {
       }
       throw new InternalServerErrorException();
     }
-
-
-
   }
 
-  async findAll() {
-    return await this.pokemonModel.find();
+  async insertMany(pokemons: CreatePokemonDto[]) {
+    try {
+
+      await this.pokemonModel.deleteMany({});
+      await this.pokemonModel.insertMany(pokemons);
+
+    } catch (error) {
+      throw new InternalServerErrorException();
+    }
+  }
+
+  async findAll(paginationDto: PaginationDto) {
+    const {limit = 10, offset = 0} = paginationDto;
+    return await this.pokemonModel
+      .find()
+      .limit(limit)
+      .skip(offset);
   }
 
   async findOne(id: string) {
@@ -102,8 +118,8 @@ export class PokemonService {
 
     // const pokemon = await this.findOne(id);
     // await pokemon.deleteOne();
-    const {deletedCount} = await this.pokemonModel.deleteOne({_id: id});
-    if(deletedCount === 0){
+    const { deletedCount } = await this.pokemonModel.deleteOne({ _id: id });
+    if (deletedCount === 0) {
       throw new NotFoundException();
     }
     return deletedCount;
